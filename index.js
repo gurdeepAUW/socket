@@ -1,36 +1,41 @@
-// index.js
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
-const path = require('path');
 
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
 
-// Serve static files from the "public" directory
-app.use(express.static(path.join(__dirname, 'public')));
+const users = {}; // To store user information
 
-// Handle the root route
-app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
-});
-
-// Handle socket connections
 io.on('connection', (socket) => {
-  console.log('a user connected');
+    console.log('A user connected');
 
-  socket.on('disconnect', () => {
-    console.log('user disconnected');
-  });
+    socket.on('register', (userId) => {
+        users[userId] = socket.id;
+        console.log(`User registered: ${userId}`);
+    });
 
-  // Listen for 'chat message' event and broadcast it
-  socket.on('chat message', (msg) => {
-    io.emit('chat message', msg);  // Broadcast message to all clients
-  });
+    socket.on('sendMessage', ({ senderId, receiverId, message }) => {
+        const receiverSocketId = users[receiverId];
+        if (receiverSocketId) {
+            io.to(receiverSocketId).emit('receiveMessage', { senderId, message });
+        } else {
+            console.log('Receiver not connected');
+        }
+    });
+
+    socket.on('disconnect', () => {
+        for (let userId in users) {
+            if (users[userId] === socket.id) {
+                delete users[userId];
+                console.log(`User disconnected: ${userId}`);
+                break;
+            }
+        }
+    });
 });
 
-const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
+server.listen(3000, () => {
+    console.log('Server is running on port 3000');
 });
