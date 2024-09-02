@@ -6,36 +6,20 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
 
-const users = {}; // To store user information
+// Serve the static files (if you have a frontend)
+app.use(express.static('public'));
 
+// Log when a user connects
 io.on('connection', (socket) => {
-    console.log('A user connected');
+  console.log(`A user connected: ${socket.id}`);
 
-    socket.on('register', (userId) => {
-        users[userId] = socket.id;
-        console.log(`User registered: ${userId}`);
-    });
-
-    socket.on('sendMessage', ({ senderId, receiverId, message }) => {
-        const receiverSocketId = users[receiverId];
-        if (receiverSocketId) {
-            io.to(receiverSocketId).emit('receiveMessage', { senderId, message });
-        } else {
-            console.log('Receiver not connected');
-        }
-    });
-
-    socket.on('disconnect', () => {
-        for (let userId in users) {
-            if (users[userId] === socket.id) {
-                delete users[userId];
-                console.log(`User disconnected: ${userId}`);
-                break;
-            }
-        }
-    });
+  // Optional: Log when a user disconnects
+  socket.on('disconnect', () => {
+    console.log(`A user disconnected: ${socket.id}`);
+  });
 });
 
-server.listen(3000, () => {
-    console.log('Server is running on port 3000');
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, () => {
+  console.log(`Server is running on port ${PORT}`);
 });
