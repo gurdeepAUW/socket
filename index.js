@@ -24,8 +24,9 @@ io.on('connection', (socket) => {
     console.log('user disconnected');
   });
 
+  // Listen for 'chat message' event and broadcast it
   socket.on('chat message', (msg) => {
-    io.emit('chat message', msg);
+    io.emit('chat message', msg);  // Broadcast message to all clients
   });
 });
 
