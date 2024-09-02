@@ -21,7 +21,7 @@
     <script>
         const socket = io();
 
-        const userId = prompt("Enter your User ID (e.g., 8979088240GU or 9872853773SU):");
+        const userId = prompt("Enter your User ID (e.g., 8979088240GU):");
         socket.emit('register', userId);
 
         const chatDiv = document.getElementById('chat');
@@ -30,7 +30,7 @@
 
         sendMessageBtn.addEventListener('click', () => {
             const message = messageInput.value;
-            const receiverId = userId === '8979088240GU' ? '9872853773SU' : '8979088240GU';
+            const receiverId = userId === '8979088240GU';
             socket.emit('sendMessage', { senderId: userId, receiverId, message });
             addMessage(`You: ${message}`, 'sent');
             messageInput.value = '';
