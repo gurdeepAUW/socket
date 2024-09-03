@@ -1,43 +1,85 @@
 const express = require('express');
 const http = require('http');
-const {Server} = require('socket.io');
-const cors = require('cors');
- 
+const socketIo = require('socket.io');
+
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server, {
-  cors: {
-    origin: '*', // Allow all origins (use a specific origin if needed)
-    methods: ['GET', 'POST'],
-  },
+const io = socketIo(server);
+
+const users = {}; // Store users and their socket connections
+const messages = {}; // Store messages
+
+// Middleware to parse JSON requests
+app.use(express.json());
+
+// API route to get user status
+app.get('/api/status/:userId', (req, res) => {
+    const userId = req.params.userId;
+    const status = users[userId] ? 'online' : 'offline';
+    res.json({ status });
 });
- 
-// Use CORS middleware
-app.use(cors());
- 
-// Log when a user connects
-io.on('connection', socket => {
-  console.log(`A user connected: ${socket.id}`);
- 
-  // Listen for 'sendMessage' events from clients
-  socket.on('sendMessage', message => {
-    console.log('Received message:', message);
-    // Emit a response back to the client
-    socket.emit('message', 'Message received: Rahul sasajs' + message);
-  });
- 
-  // const interval = setInterval(() => {
-  //   io.emit('message', 'Hello from the server!');
-  //   console.log("message sent to client ");
-  // }, 2000); // 10 seconds
- 
-  socket.on('disconnect', () => {
-    console.log(`A user disconnected: ${socket.id}`);
-    //clearInterval(interval);
-     });
+
+// API route to send a message via HTTP
+app.post('/api/send-message', (req, res) => {
+    const { from, to, message } = req.body;
+    if (users[to]) {
+        users[to].emit('receive-message', { from, message, status: 'single-tick' });
+        messages[to].push({ from, message, status: 'single-tick' });
+        res.json({ success: true, status: 'Message sent' });
+    } else {
+        res.json({ success: false, status: 'User is offline' });
+    }
 });
- 
-const PORT = 3000;
-server.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
+
+// Socket.io connection event
+io.on('connection', (socket) => {
+    console.log('A user connected');
+
+    socket.on('register', (userId) => {
+        users[userId] = socket;
+        messages[userId] = messages[userId] || [];
+        io.emit('user-status', { userId, status: 'online' });
+        console.log(`${userId} is now online`);
+    });
+
+    socket.on('send-message', ({ from, to, message }) => {
+        const messageData = { from, message, status: 'single-tick' };
+        if (users[to]) {
+            users[to].emit('receive-message', messageData);
+            messages[to].push(messageData);
+        }
+    });
+
+    socket.on('message-received', ({ from, to }) => {
+        messages[to].forEach(msg => {
+            if (msg.from === from && msg.status === 'single-tick') {
+                msg.status = 'double-tick';
+            }
+        });
+        users[from].emit('message-status', { to, status: 'double-tick' });
+    });
+
+    socket.on('message-read', ({ from, to }) => {
+        messages[to].forEach(msg => {
+            if (msg.from === from && msg.status === 'double-tick') {
+                msg.status = 'blue-double-tick';
+            }
+        });
+        users[from].emit('message-status', { to, status: 'blue-double-tick' });
+    });
+
+    socket.on('disconnect', () => {
+        for (const userId in users) {
+            if (users[userId] === socket) {
+                delete users[userId];
+                io.emit('user-status', { userId, status: 'offline' });
+                console.log(`${userId} disconnected`);
+                break;
+            }
+        }
+    });
+});
+
+server.listen(3000, () => {
+    console.log('Server is running on port 3000');
 });
